@@ -1,0 +1,8 @@
+/build/
+/main
+/main.o
+/main.ali
+*.o
+*.elf
+*.bin
+*.uf2
