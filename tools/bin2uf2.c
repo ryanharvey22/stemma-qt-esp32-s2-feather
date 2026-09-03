@@ -10,7 +10,7 @@
 #define FLAGS 0x2000 /* family ID present */
 
 int main(int argc, char **argv) {
-    uint32_t base = 0x10000;
+    uint32_t base = 0;
     if (argc < 3 || argc > 4) {
         fprintf(stderr, "usage: %s in.bin out.uf2 [flash_addr]\n", argv[0]);
         return 2;

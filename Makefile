@@ -15,7 +15,8 @@ SIZE    := $(XT_ROOT)/bin/xtensa-esp32s2-elf-size
 HOSTCC  ?= gcc
 
 BUILD   := build
-UF2_BASE ?= 0x10000
+# TinyUF2 treats this as an offset into ota_0, not an absolute flash address.
+UF2_BASE ?= 0x0
 
 ASFLAGS := -mabi=call0 -mtext-section-literals -mlongcalls -ffreestanding
 LDFLAGS := -mabi=call0 -nostdlib -Wl,-T,hw/esp32s2.ld -Wl,--gc-sections -Wl,-e,_start
