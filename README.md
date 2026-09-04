@@ -1,3 +1,12 @@
+1. Drive the power enable gpio pin to high to power the diplay chip
+2. Need to toggle the reset to clear the screen controller
+3. Configure the esp32 SPI peripheral registers (baud rate, clock phase, bit order)
+4. Pull the TFT DC pin low and stream initialization command bytes over SPI
+5. Set an address window (0x2A/0x2B), send the RAM write command (0x2C), pull 
+   TFT_DC high, and stream your raw pixel array data.
+
+The ESP32 communicates with the on board dispay ove SPI.
+
 https://www.adafruit.com/product/5300
 
 ### QEMU setup for simulation
