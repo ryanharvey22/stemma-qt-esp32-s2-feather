@@ -17,10 +17,14 @@ SECTIONS
         KEEP(*(.text._start))
         *(.literal .literal.*)
         *(.text .text.*)
+        *(.rodata .rodata.*)
+        *(.data .data.*)
         . = ALIGN(4);
     } > iram
 
     .bss (NOLOAD) : {
+        *(.bss .bss.*)
+        *(COMMON)
         . = ALIGN(16);
         _stack_bottom = .;
         . += 4K;

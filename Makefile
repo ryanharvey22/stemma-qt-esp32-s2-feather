@@ -1,6 +1,6 @@
 # Bare-metal ESP32-S2 (Xtensa asm, no Python, no IDF).
 #
-#   make              build blink.elf / blink.bin / blink.uf2
+#   make              build blink.uf2 (asm LED) and hello.uf2 (C LED)
 #   make uf2          same; copy blink.uf2 onto FTHRS2BOOT
 #
 # TinyUF2: slow double-tap RESET, drop build/blink.uf2 on FTHRS2BOOT.
@@ -19,11 +19,16 @@ BUILD   := build
 UF2_BASE ?= 0x0
 
 ASFLAGS := -mabi=call0 -mtext-section-literals -mlongcalls -ffreestanding
+CFLAGS  := -mabi=call0 -mtext-section-literals -mlongcalls -ffreestanding \
+           -fno-builtin -Os -Ihw
 LDFLAGS := -mabi=call0 -nostdlib -Wl,-T,hw/esp32s2.ld -Wl,--gc-sections -Wl,-e,_start
+
+SRCS_C := hw/gpio.c hw/tft.c hw/font5x7.c hw/app.c hw/string.c
+OBJS   := $(patsubst hw/%.c,$(BUILD)/%.o,$(SRCS_C))
 
 .PHONY: all uf2 clean dump toolchain-check
 
-all: toolchain-check $(BUILD)/blink.uf2
+all: toolchain-check $(BUILD)/blink.uf2 $(BUILD)/hello.uf2
 
 uf2: all
 
@@ -42,14 +47,27 @@ $(BUILD)/elf2espimg: tools/elf2espimg.c | $(BUILD)
 $(BUILD)/bin2uf2: tools/bin2uf2.c | $(BUILD)
 	$(HOSTCC) -O2 -o $@ $<
 
+$(BUILD)/%.o: hw/%.c | $(BUILD)
+	$(XT) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/blink.elf: hw/start.S hw/esp32s2.ld | $(BUILD)
 	$(XT) $(ASFLAGS) $(LDFLAGS) -o $@ hw/start.S
+	$(SIZE) $@
+
+$(BUILD)/hello.elf: hw/start.S hw/esp32s2.ld $(OBJS)
+	$(XT) $(ASFLAGS) -DHELLO $(LDFLAGS) -o $@ hw/start.S $(OBJS)
 	$(SIZE) $@
 
 $(BUILD)/blink.bin: $(BUILD)/blink.elf $(BUILD)/elf2espimg
 	$(BUILD)/elf2espimg $< $@
 
+$(BUILD)/hello.bin: $(BUILD)/hello.elf $(BUILD)/elf2espimg
+	$(BUILD)/elf2espimg $< $@
+
 $(BUILD)/blink.uf2: $(BUILD)/blink.bin $(BUILD)/bin2uf2
+	$(BUILD)/bin2uf2 $< $@ $(UF2_BASE)
+
+$(BUILD)/hello.uf2: $(BUILD)/hello.bin $(BUILD)/bin2uf2
 	$(BUILD)/bin2uf2 $< $@ $(UF2_BASE)
 
 dump: $(BUILD)/blink.elf

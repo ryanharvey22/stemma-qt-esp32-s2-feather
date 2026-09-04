@@ -60,10 +60,12 @@ int main(int argc, char **argv) {
         if (fread(&ph, sizeof ph, 1, in) != 1) die("phdr");
         if (ph.p_type != PT_LOAD || ph.p_filesz == 0) continue;
         if (nseg >= MAX_SEG) die("too many segments");
+        /* ROM / 2nd-stage want a 16-byte multiple. 2220 failed; 208 (16n) ran. */
+        uint32_t padsz = (ph.p_filesz + 15u) & ~15u;
         segs[nseg].vaddr = ph.p_vaddr;
-        segs[nseg].filesz = ph.p_filesz;
+        segs[nseg].filesz = padsz;
         segs[nseg].offset = ph.p_offset;
-        segs[nseg].data = malloc(ph.p_filesz);
+        segs[nseg].data = calloc(1, padsz);
         if (!segs[nseg].data) die("oom");
         if (fseek(in, (long)ph.p_offset, SEEK_SET) != 0) die("seg seek");
         if (fread(segs[nseg].data, 1, ph.p_filesz, in) != ph.p_filesz) die("seg read");

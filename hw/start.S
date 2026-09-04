@@ -1,8 +1,8 @@
 /*
  * Bare-metal blink for the Adafruit ESP32-S2 TFT Feather (red LED = GPIO 13).
  *
- * No C, no IDF, no libc. The 2nd-stage bootloader copies this into IRAM and
- * jumps to _start. We never return.
+ * No IDF, no libc. After watchdogs, we call0 app_main (C) to drive the
+ * ST7789. The 2nd-stage bootloader copies this into IRAM and jumps here.
  *
  * Xtensa call0 ABI (we pass -mabi=call0 to gcc):
  *   a0  return address after call0 / ret
@@ -91,53 +91,48 @@ _start:
     s32i    a3, a2, 0x48
     s32i    a3, a2, 0x64
 
-    /*----------------------------------------------------------------------
-     * GPIO 13 = the little red LED labeled #13.
-     *
-     * On ESP32 a pad is not “just a GPIO.” IO_MUX picks a function
-     * (SPI, UART, GPIO, …). The GPIO matrix then picks which *signal*
-     * drives that GPIO. Then ENABLE lets the pin actually toggle.
-     *----------------------------------------------------------------------*/
-
-    /* IO_MUX for GPIO13 at 0x3F409038.
-     * 0x1400 = MCU_SEL=1 (function GPIO) and FUN_DRV=2 (~20 mA). */
+    /* GPIO 13 = red LED labeled #13. */
     movi    a2, 0x3F409038
     movi    a3, 0x1400
     s32i    a3, a2, 0
-
-    /* GPIO_FUNC13_OUT_SEL: 0x100 means “drive this pad from GPIO_OUT bit N”,
-     * not from some peripheral. */
     movi    a2, 0x3F404588
     movi    a3, 0x100
     s32i    a3, a2, 0
-
-    /* GPIO_ENABLE_W1TS: write-1-to-set. Writing (1<<13) enables output on 13
-     * without touching the other 31 enable bits. */
     movi    a2, 0x3F404024
     movi    a3, (1 << 13)
     s32i    a3, a2, 0
-
-    /* Keep the toggle addresses in a5/a6 so the loop is three cheap insns.
-     * W1TS = write-1-to-set  (LED on),  W1TC = write-1-to-clear (LED off). */
     movi    a5, 0x3F404008
     movi    a6, 0x3F40400C
-    movi    a7, (1 << 13)       /* bit mask, reused every iteration */
+    movi    a7, (1 << 13)
 
-    /* Local label (.L...) is not exported. j is a PC-relative jump. */
-.Lblink:
-    s32i    a7, a5, 0           /* LED on */
-    call0   delay               /* a0 := return addr; jump to delay */
-    s32i    a7, a6, 0           /* LED off */
+#ifdef HELLO
+    /* Slow, unmissable blinks, then C. If you never see these, the
+     * image did not start (bootloader rejected it). */
+    movi    a8, 6
+.Lpreblink:
+    s32i    a7, a5, 0
     call0   delay
-    j       .Lblink             /* forever — there is no “return to main” */
+    s32i    a7, a6, 0
+    call0   delay
+    addi    a8, a8, -1
+    bnez    a8, .Lpreblink
+    .extern app_main
+    call0   app_main
+.Lhang:
+    j       .Lhang
+#else
+.Lblink:
+    s32i    a7, a5, 0
+    call0   delay
+    s32i    a7, a6, 0
+    call0   delay
+    j       .Lblink
+#endif
 
     .align 4
 delay:
-    /* Busy-wait. Not a real timer. Count is tuned so you can *see* the blink
-     * at the ROM/bootloader clock (tens of MHz). call0/ret: delay must not
-     * trash a0, and must not call anything else unless it saves a0. */
     movi    a3, 8000000
 .Ldelay:
-    addi    a3, a3, -1          /* a3 = a3 - 1 */
-    bnez    a3, .Ldelay         /* if a3 != 0, spin */
-    ret                         /* jump to a0 (back into .Lblink) */
+    addi    a3, a3, -1
+    bnez    a3, .Ldelay
+    ret
