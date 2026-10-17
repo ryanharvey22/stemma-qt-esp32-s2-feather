@@ -23,8 +23,8 @@ CFLAGS  := -mabi=call0 -mtext-section-literals -mlongcalls -ffreestanding \
            -fno-builtin -Os -Ihw
 LDFLAGS := -mabi=call0 -nostdlib -Wl,-T,hw/esp32s2.ld -Wl,--gc-sections -Wl,-e,_start
 
-SRCS_C := hw/gpio.c hw/tft.c hw/font5x7.c hw/app.c hw/string.c
-OBJS   := $(patsubst hw/%.c,$(BUILD)/%.o,$(SRCS_C))
+# hello.uf2: LED blinks, then a solid red ST7789 fill (no C).
+SRCS_HELLO := hw/start.S hw/gpio.S hw/spi.S hw/drivers/ST7789.S
 
 .PHONY: all uf2 clean dump toolchain-check
 
@@ -47,15 +47,12 @@ $(BUILD)/elf2espimg: tools/elf2espimg.c | $(BUILD)
 $(BUILD)/bin2uf2: tools/bin2uf2.c | $(BUILD)
 	$(HOSTCC) -O2 -o $@ $<
 
-$(BUILD)/%.o: hw/%.c | $(BUILD)
-	$(XT) $(CFLAGS) -c -o $@ $<
-
 $(BUILD)/blink.elf: hw/start.S hw/esp32s2.ld | $(BUILD)
 	$(XT) $(ASFLAGS) $(LDFLAGS) -o $@ hw/start.S
 	$(SIZE) $@
 
-$(BUILD)/hello.elf: hw/start.S hw/esp32s2.ld $(OBJS)
-	$(XT) $(ASFLAGS) -DHELLO $(LDFLAGS) -o $@ hw/start.S $(OBJS)
+$(BUILD)/hello.elf: $(SRCS_HELLO) hw/esp32s2.ld | $(BUILD)
+	$(XT) $(ASFLAGS) -DHELLO $(LDFLAGS) -o $@ $(SRCS_HELLO)
 	$(SIZE) $@
 
 $(BUILD)/blink.bin: $(BUILD)/blink.elf $(BUILD)/elf2espimg

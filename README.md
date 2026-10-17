@@ -5,6 +5,8 @@
 5. Set an address window (0x2A/0x2B), send the RAM write command (0x2C), pull 
    TFT_DC high, and stream your raw pixel array data.
 
+https://www.cadence.com/content/dam/cadence-www/global/en_US/documents/tools/silicon-solutions/compute-ip/isa-summary.pdf
+
 The ESP32 communicates with the on board dispay ove SPI.
 
 https://www.adafruit.com/product/5300

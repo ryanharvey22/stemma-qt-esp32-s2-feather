@@ -106,9 +106,10 @@ _start:
     movi    a7, (1 << 13)
 
 #ifdef HELLO
-    /* Slow, unmissable blinks, then C. If you never see these, the
-     * image did not start (bootloader rejected it). */
-    movi    a8, 6
+    /* A couple of LED blinks so you know we booted, then fill the TFT red.
+     * If the LED blinks but the glass stays black: power/reset/SPI/init.
+     * If you see solid red: the screen path works. Text comes after that. */
+    movi    a8, 4
 .Lpreblink:
     s32i    a7, a5, 0
     call0   delay
@@ -116,8 +117,11 @@ _start:
     call0   delay
     addi    a8, a8, -1
     bnez    a8, .Lpreblink
-    .extern app_main
-    call0   app_main
+    .extern st7789_init
+    .extern st7789_fill
+    call0   st7789_init
+    movi    a2, 0xF800          /* RGB565 red */
+    call0   st7789_fill
 .Lhang:
     j       .Lhang
 #else

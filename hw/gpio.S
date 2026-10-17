@@ -35,8 +35,8 @@ gpio_out_setup:
     /* l32r = "load 32-bit from a PC-relative literal".
      * movi cannot hold a 32-bit address, so the constant lives in a .word
      * later in this file and we load it into a register. */
-    l32r    a3, L_IOMUX_BASE    /* a3 = 0x3F409000, the IO_MUX register block */
-    l32r    a4, L_IOMUX_OFF     /* a4 = &iomux_off[0], pointer to the lookup table */
+    movi    a3, 0x3F409000      /* a3 = IO_MUX register block (assembler emits l32r) */
+    movi    a4, iomux_off       /* a4 = &iomux_off[0], pointer to the lookup table */
 
     /* addx2 dest, src, base  means  dest = base + (src << 1).
      * Each table entry is a uint16_t (2 bytes), so pin * 2 is the byte
@@ -53,7 +53,7 @@ gpio_out_setup:
 
     /* 0x1400 is also too wide for a small immediate, so it is a literal.
      * Bits: function = GPIO, drive strength = 20 mA (matches the C). */
-    l32r    a4, L_0x1400        /* a4 = 0x1400 */
+    movi    a4, 0x1400          /* a4 = GPIO function + 20 mA drive */
     s32i    a4, a3, 0           /* store 32 bits: *a3 = 0x1400 */
 
     /* memw = memory wait. Xtensa can keep going before an MMIO store is
@@ -65,7 +65,7 @@ gpio_out_setup:
     /* GPIO_FUNCn_OUT_SEL_CFG for pin n lives at base + 0x554 + n*4.
      * 0x100 = "output comes from the GPIO_OUT register" (not a peri signal). */
 
-    l32r    a3, L_GPIO_BASE     /* a3 = 0x3F404000 */
+    movi    a3, 0x3F404000      /* a3 = GPIO register block */
     movi    a4, 0x554           /* movi fits 12-bit signed immediates; 0x554 is fine */
     add     a3, a3, a4          /* a3 = GPIO_BASE + 0x554 */
 
@@ -83,7 +83,7 @@ gpio_out_setup:
      * Pins 32–45 use ENABLE1_W1TS at GPIO_BASE + 0x30.
      * Writing a 1 in bit k enables that pin; other bits are left alone. */
 
-    l32r    a3, L_GPIO_BASE     /* a3 = GPIO_BASE again (a3 was clobbered above) */
+    movi    a3, 0x3F404000      /* a3 = GPIO_BASE again (a3 was clobbered above) */
     movi    a4, 32              /* a4 = 32, the bank split */
 
     /* blt a, b, label  = branch if a < b (signed).
@@ -131,13 +131,9 @@ gpio_out_setup:
 .global gpio_write
 .type gpio_write, @function
 gpio_write:
-    /* entry a1, 32  is the windowed-ABI prologue: rotate the register
-     * window and allocate a 32-byte frame. This project compiles -mabi=call0
-     * and start.S clears WOE, so the caller already left pin in a2 / high
-     * in a3 and expects a plain ret. Left as written. */
-    entry   a1, 32
+    /* call0: pin in a2, high in a3. No entry/retw (WOE is off). */
 
-    l32r    a4, L_GPIO_BASE     /* a4 = 0x3F404000; we will add the W1TS/W1TC offset */
+    movi    a4, 0x3F404000      /* a4 = GPIO_BASE; we will add the W1TS/W1TC offset */
     movi    a5, 32
     blt     a2, a5, .L_write_low_pins   /* if pin < 32, low bank (bits 0–31) */
 
@@ -170,16 +166,7 @@ gpio_write:
     s32i    a5, a4, 0           /* wr(addr, bit) — only that one pin changes */
     memw                        /* drain the store so the pad updates before we return */
 
-    /* retw = windowed return (undoes entry). Pair with entry; call0 uses ret. */
-    retw
-
-/* Literals for l32r. Must be 4-byte aligned and within ~256 KiB of the
- * loads (they are in the same .text section, so they are). */
-.align 4
-L_GPIO_BASE:  .word 0x3F404000  /* GPIO register block */
-L_IOMUX_BASE: .word 0x3F409000  /* IO_MUX pad-function block */
-L_0x1400:     .word 0x1400      /* GPIO function + 20 mA drive */
-L_IOMUX_OFF:  .word iomux_off   /* address of the table, not a table entry */
+    ret
 
 /* IO_MUX register offset for each pad we touch. Unused pins stay 0.
  * Indexed by GPIO number; each .short is 2 bytes (see addx2 above). */
